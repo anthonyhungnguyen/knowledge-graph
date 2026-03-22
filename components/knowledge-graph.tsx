@@ -1,206 +1,385 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { DataSet, Network, type Edge, type IdType, type Node, type Options } from "vis-network/standalone";
+import { getFocusNodeIds } from "@/lib/graph";
 import type { ExplorationGraph, KnowledgeNode } from "@/lib/types";
-
-type PositionedNode = {
-  node: KnowledgeNode;
-  x: number;
-  y: number;
-};
 
 type KnowledgeGraphProps = {
   graph: ExplorationGraph | null;
   selectedNodeId: string | null;
-  isLoading: boolean;
   onNodeSelect: (node: KnowledgeNode) => void;
-  onNodeExpand: (node: KnowledgeNode) => void;
 };
-
-const graphWidth = 760;
-const graphHeight = 520;
-const centerX = graphWidth / 2;
-const centerY = graphHeight / 2;
-
-function buildAdjacency(graph: ExplorationGraph) {
-  const adjacency = new Map<string, Set<string>>();
-
-  for (const edge of graph.edges) {
-    if (!adjacency.has(edge.source)) {
-      adjacency.set(edge.source, new Set());
-    }
-
-    if (!adjacency.has(edge.target)) {
-      adjacency.set(edge.target, new Set());
-    }
-
-    adjacency.get(edge.source)?.add(edge.target);
-    adjacency.get(edge.target)?.add(edge.source);
-  }
-
-  return adjacency;
-}
-
-function buildLevels(graph: ExplorationGraph) {
-  const levels = new Map<string, number>();
-  const adjacency = buildAdjacency(graph);
-  const queue = [graph.rootId];
-
-  levels.set(graph.rootId, 0);
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-
-    if (!current) {
-      continue;
-    }
-
-    const currentLevel = levels.get(current) ?? 0;
-    const neighbors = adjacency.get(current) ?? new Set<string>();
-
-    for (const neighbor of neighbors) {
-      if (levels.has(neighbor)) {
-        continue;
-      }
-
-      levels.set(neighbor, currentLevel + 1);
-      queue.push(neighbor);
-    }
-  }
-
-  return levels;
-}
-
-function layoutNodes(graph: ExplorationGraph): PositionedNode[] {
-  const levels = buildLevels(graph);
-  const nodesByLevel = new Map<number, KnowledgeNode[]>();
-
-  for (const node of graph.nodes) {
-    const level = levels.get(node.id) ?? 1;
-
-    if (!nodesByLevel.has(level)) {
-      nodesByLevel.set(level, []);
-    }
-
-    nodesByLevel.get(level)?.push(node);
-  }
-
-  const positions: PositionedNode[] = [];
-  const maxLevel = Math.max(...nodesByLevel.keys(), 0);
-  const radiusStep = maxLevel > 0 ? 150 / maxLevel : 0;
-
-  for (const [level, levelNodes] of [...nodesByLevel.entries()].sort((a, b) => a[0] - b[0])) {
-    if (level === 0) {
-      positions.push({
-        node: levelNodes[0],
-        x: centerX,
-        y: centerY
-      });
-      continue;
-    }
-
-    const radius = 110 + level * radiusStep;
-    levelNodes.forEach((node, index) => {
-      const angle = (Math.PI * 2 * index) / levelNodes.length - Math.PI / 2;
-      positions.push({
-        node,
-        x: centerX + Math.cos(angle) * radius,
-        y: centerY + Math.sin(angle) * radius
-      });
-    });
-  }
-
-  return positions;
-}
 
 function fillForType(type: KnowledgeNode["type"]) {
   switch (type) {
     case "topic":
-      return "#1f5eff";
+      return {
+        background: "#2f80ff",
+        border: "#d9eeff",
+        highlight: {
+          background: "#58a6ff",
+          border: "#ffffff"
+        }
+      };
     case "process":
-      return "#0f9d7a";
+      return {
+        background: "#0ea77f",
+        border: "#d6fff0",
+        highlight: {
+          background: "#2ecf9e",
+          border: "#ffffff"
+        }
+      };
     case "example":
-      return "#f08b24";
+      return {
+        background: "#f19a3e",
+        border: "#fff0d9",
+        highlight: {
+          background: "#ffb968",
+          border: "#ffffff"
+        }
+      };
     case "person":
-      return "#c03f5a";
+      return {
+        background: "#d55078",
+        border: "#ffe1ea",
+        highlight: {
+          background: "#ef7096",
+          border: "#ffffff"
+        }
+      };
     default:
-      return "#304156";
+      return {
+        background: "#49617c",
+        border: "#dbe7f4",
+        highlight: {
+          background: "#6483a5",
+          border: "#ffffff"
+        }
+      };
   }
 }
 
-export function KnowledgeGraph({
-  graph,
-  selectedNodeId,
-  isLoading,
-  onNodeSelect,
-  onNodeExpand
-}: KnowledgeGraphProps) {
-  const positionedNodes = useMemo(() => (graph ? layoutNodes(graph) : []), [graph]);
-  const nodeById = useMemo(() => {
-    return new Map(positionedNodes.map((entry) => [entry.node.id, entry]));
-  }, [positionedNodes]);
+function buildItems(graph: ExplorationGraph, selectedNodeId: string | null) {
+  const focusedNodeIds = getFocusNodeIds(graph, selectedNodeId);
+
+  const nodes: Node[] = graph.nodes.map((node) => {
+    const isFocused = focusedNodeIds.has(node.id);
+    const isSelected = node.id === selectedNodeId;
+
+    return {
+      id: node.id,
+      label: node.label,
+      shape: "dot",
+      size: node.type === "topic" ? (isSelected ? 42 : 38) : isSelected ? 30 : 26,
+      font: {
+        color: isFocused ? "#f7fbff" : "rgba(247, 251, 255, 0.32)",
+        size: node.type === "topic" ? 18 : 14,
+        face: "Inter, ui-sans-serif, system-ui, sans-serif",
+        strokeWidth: 0
+      },
+      color: isFocused
+        ? fillForType(node.type)
+        : {
+            background: "rgba(84, 100, 122, 0.22)",
+            border: "rgba(189, 204, 224, 0.22)",
+            highlight: {
+              background: "rgba(84, 100, 122, 0.22)",
+              border: "rgba(189, 204, 224, 0.22)"
+            }
+          },
+      borderWidth: isSelected ? 4 : node.type === "topic" ? 3 : 2,
+      shadow: {
+        enabled: isFocused,
+        color: "rgba(3, 10, 19, 0.28)",
+        size: 24,
+        x: 0,
+        y: 12
+      },
+      mass: node.type === "topic" ? 4 : 2.2
+    };
+  });
+
+  const edges: Edge[] = graph.edges.map((edge, index) => {
+    const isFocusedEdge = !selectedNodeId || edge.source === selectedNodeId || edge.target === selectedNodeId;
+
+    return {
+      id: `${edge.source}-${edge.target}-${index}`,
+      from: edge.source,
+      to: edge.target,
+      label: edge.label,
+      color: {
+        color: isFocusedEdge ? "rgba(224, 231, 255, 0.22)" : "rgba(224, 231, 255, 0.08)",
+        highlight: "rgba(224, 231, 255, 0.42)",
+        hover: "rgba(224, 231, 255, 0.36)"
+      },
+      font: {
+        color: isFocusedEdge ? "rgba(232, 238, 247, 0.78)" : "rgba(232, 238, 247, 0.24)",
+        size: 11,
+        face: "Inter, ui-sans-serif, system-ui, sans-serif",
+        background: isFocusedEdge ? "rgba(10, 17, 28, 0.9)" : "rgba(10, 17, 28, 0.42)",
+        strokeWidth: 0
+      },
+      width: isFocusedEdge ? 1.5 : 1,
+      selectionWidth: 2.2,
+      smooth: {
+        enabled: true,
+        type: "dynamic",
+        roundness: 0.28
+      },
+      arrows: {
+        to: {
+          enabled: true,
+          scaleFactor: 0.6
+        }
+      }
+    };
+  });
+
+  return { nodes, edges };
+}
+
+function withStoredPositions(
+  graph: ExplorationGraph,
+  nodes: Node[],
+  positionCache: Map<string, { x: number; y: number }>
+) {
+  const nextPositions = new Map(positionCache);
+  const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const childrenBySource = new Map<string, string[]>();
+  const depthById = new Map<string, number>([[graph.rootId, 0]]);
+  const queue = [graph.rootId];
+
+  if (!nextPositions.has(graph.rootId)) {
+    nextPositions.set(graph.rootId, { x: 0, y: 0 });
+  }
+
+  for (const edge of graph.edges) {
+    const currentChildren = childrenBySource.get(edge.source) ?? [];
+    currentChildren.push(edge.target);
+    childrenBySource.set(edge.source, currentChildren);
+  }
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+
+    if (!currentId) {
+      continue;
+    }
+
+    const currentDepth = depthById.get(currentId) ?? 0;
+    const children = childrenBySource.get(currentId) ?? [];
+
+    children.forEach((childId) => {
+      if (!depthById.has(childId) && nodeIds.has(childId)) {
+        depthById.set(childId, currentDepth + 1);
+        queue.push(childId);
+      }
+    });
+
+    const missingChildren = children.filter((childId) => nodeIds.has(childId) && !nextPositions.has(childId));
+
+    if (missingChildren.length === 0) {
+      continue;
+    }
+
+    const parentPosition = nextPositions.get(currentId) ?? { x: 0, y: 0 };
+    const parentAngle = currentId === graph.rootId ? -Math.PI / 2 : Math.atan2(parentPosition.y, parentPosition.x);
+    const radius = currentId === graph.rootId ? 260 : 190;
+    const spread = currentId === graph.rootId ? Math.PI * 1.7 : Math.min(Math.PI * 1.15, Math.max(Math.PI / 2, missingChildren.length * 0.55));
+    const startAngle = parentAngle - spread / 2;
+
+    missingChildren.forEach((childId, index) => {
+      const angle = startAngle + (spread * (index + 1)) / (missingChildren.length + 1);
+      nextPositions.set(childId, {
+        x: parentPosition.x + Math.cos(angle) * radius,
+        y: parentPosition.y + Math.sin(angle) * radius
+      });
+    });
+  }
+
+  const unpositionedNodes = graph.nodes.filter((node) => !nextPositions.has(node.id));
+
+  unpositionedNodes.forEach((node, index) => {
+    const angle = (Math.PI * 2 * index) / Math.max(unpositionedNodes.length, 1);
+    nextPositions.set(node.id, {
+      x: Math.cos(angle) * 340,
+      y: Math.sin(angle) * 340
+    });
+  });
+
+  return nodes.map((node) => {
+    const position = nextPositions.get(String(node.id));
+
+    if (!position) {
+      return node;
+    }
+
+    return {
+      ...node,
+      x: position.x,
+      y: position.y
+    };
+  });
+}
+
+const networkOptions: Options = {
+  autoResize: true,
+  interaction: {
+    hover: true,
+    tooltipDelay: 120,
+    navigationButtons: false,
+    keyboard: false
+  },
+  physics: {
+    enabled: false
+  },
+  nodes: {
+    shape: "dot"
+  },
+  edges: {
+    selectionWidth: 2
+  }
+};
+
+export function KnowledgeGraph({ graph, selectedNodeId, onNodeSelect }: KnowledgeGraphProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const networkRef = useRef<Network | null>(null);
+  const dataRef = useRef<{ nodes: DataSet<Node>; edges: DataSet<Edge> } | null>(null);
+  const positionCacheRef = useRef(new Map<string, { x: number; y: number }>());
+  const currentRootIdRef = useRef<string | null>(null);
+  const nodeByIdRef = useRef<Map<string, KnowledgeNode>>(new Map());
+  const onNodeSelectRef = useRef(onNodeSelect);
+  const nodeById = useMemo(() => new Map(graph?.nodes.map((node) => [node.id, node]) ?? []), [graph]);
+
+  useEffect(() => {
+    nodeByIdRef.current = nodeById;
+    onNodeSelectRef.current = onNodeSelect;
+  }, [nodeById, onNodeSelect]);
+
+  useEffect(() => {
+    if (!graph || !containerRef.current || networkRef.current) {
+      return;
+    }
+
+    const data = {
+      nodes: new DataSet<Node>(),
+      edges: new DataSet<Edge>()
+    };
+    const network = new Network(containerRef.current, data, networkOptions);
+
+    network.on("click", (params?: { nodes?: IdType[] }) => {
+      const clickedNodeId = params?.nodes?.[0];
+
+      if (clickedNodeId) {
+        const node = nodeByIdRef.current.get(String(clickedNodeId));
+
+        if (node) {
+          onNodeSelectRef.current(node);
+        }
+        return;
+      }
+
+      const rootNodeId = currentRootIdRef.current;
+      const rootNode = rootNodeId ? nodeByIdRef.current.get(rootNodeId) : null;
+
+      if (rootNode) {
+        onNodeSelectRef.current(rootNode);
+      }
+    });
+
+    networkRef.current = network;
+    dataRef.current = data;
+  }, [graph]);
+
+  useEffect(() => {
+    return () => {
+      networkRef.current?.destroy();
+      networkRef.current = null;
+      dataRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const network = networkRef.current;
+    const data = dataRef.current;
+
+    if (!network || !data || !graph) {
+      return;
+    }
+
+    const previousRootId = currentRootIdRef.current;
+    const isNewRoot = previousRootId !== graph.rootId;
+
+    if (isNewRoot) {
+      positionCacheRef.current = new Map();
+    } else {
+      const currentPositions = network.getPositions();
+
+      Object.entries(currentPositions).forEach(([id, position]) => {
+        positionCacheRef.current.set(id, {
+          x: position.x,
+          y: position.y
+        });
+      });
+    }
+
+    currentRootIdRef.current = graph.rootId;
+
+    const built = buildItems(graph, selectedNodeId);
+    const positionedNodes = withStoredPositions(graph, built.nodes, positionCacheRef.current);
+
+    positionCacheRef.current = new Map(
+      positionedNodes.map((node) => [
+        String(node.id),
+        {
+          x: node.x ?? 0,
+          y: node.y ?? 0
+        }
+      ])
+    );
+
+    data.nodes.clear();
+    data.edges.clear();
+    data.nodes.add(positionedNodes);
+    data.edges.add(built.edges);
+
+    if (isNewRoot) {
+      network.fit({
+        animation: {
+          duration: 350,
+          easingFunction: "easeInOutQuad"
+        }
+      });
+    }
+
+    if (!selectedNodeId) {
+      network.unselectAll();
+      return;
+    }
+
+    network.selectNodes([selectedNodeId]);
+    network.focus(selectedNodeId, {
+      scale: 1.05,
+      animation: {
+        duration: 350,
+        easingFunction: "easeInOutQuad"
+      }
+    });
+  }, [graph, selectedNodeId]);
 
   if (!graph) {
     return (
       <div className="graph-empty">
-        <p>Submit a topic to generate the first answer and related bubbles.</p>
+        <p>Enter a topic to begin.</p>
       </div>
     );
   }
 
   return (
     <div className="graph-shell">
-      <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} className="graph-canvas" role="img" aria-label="Knowledge graph">
-        {graph.edges.map((edge) => {
-          const source = nodeById.get(edge.source);
-          const target = nodeById.get(edge.target);
-
-          if (!source || !target) {
-            return null;
-          }
-
-          const midX = (source.x + target.x) / 2;
-          const midY = (source.y + target.y) / 2;
-
-          return (
-            <g key={`${edge.source}-${edge.target}-${edge.label}`}>
-              <line className="graph-edge" x1={source.x} y1={source.y} x2={target.x} y2={target.y} />
-              <text className="graph-edge-label" x={midX} y={midY}>
-                {edge.label}
-              </text>
-            </g>
-          );
-        })}
-
-        {positionedNodes.map(({ node, x, y }) => {
-          const selected = node.id === selectedNodeId;
-          const radius = node.type === "topic" ? 46 : 34;
-
-          return (
-            <g key={node.id} transform={`translate(${x} ${y})`}>
-              <circle
-                className={selected ? "graph-node selected" : "graph-node"}
-                cx={0}
-                cy={0}
-                r={radius}
-                fill={fillForType(node.type)}
-                onClick={() => onNodeSelect(node)}
-              />
-              <foreignObject x={-radius + 8} y={-18} width={radius * 2 - 16} height={40} pointerEvents="none">
-                <div className="node-label">{node.label}</div>
-              </foreignObject>
-              <circle className="graph-expand" cx={radius - 2} cy={radius - 2} r={12} onClick={() => onNodeExpand(node)} />
-              <text className="graph-expand-icon" x={radius - 2} y={radius + 2} onClick={() => onNodeExpand(node)}>
-                +
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-
-      <div className="graph-legend">
-        <p>{isLoading ? "Loading more related knowledge..." : "Click a bubble to inspect it. Click + to expand it."}</p>
-      </div>
+      <div ref={containerRef} className="graph-canvas graph-vis" />
     </div>
   );
 }

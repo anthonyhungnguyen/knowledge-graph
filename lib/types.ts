@@ -1,4 +1,5 @@
 export type GraphNodeType = "topic" | "concept" | "process" | "person" | "example";
+export type GraphExpandMode = "related" | "deeper";
 
 export type KnowledgeNode = {
   id: string;
@@ -13,14 +14,19 @@ export type KnowledgeEdge = {
   label: string;
 };
 
+export type GraphSource = "openai" | "mock" | "mixed";
+
 export type ExplorationGraph = {
   rootId: string;
   topic: string;
   summary: string;
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
+  source: GraphSource;
+  notice?: string;
 };
 
 export type ExploreRequest = {
   topic: string;
+  mode?: GraphExpandMode;
 };
