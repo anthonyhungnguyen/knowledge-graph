@@ -3,26 +3,36 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "node --import tsx server/index.ts --api-only",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node --import tsx server/index.ts",
     "lint": "eslint .",
-    "typecheck": "next typegen && tsc --noEmit --incremental false"
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
-    "next": "16.2.1",
+    "express": "^5.1.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "vis-network": "^10.0.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/express": "^5.0.3",
+    "@vitejs/plugin-react": "^5.1.0",
     "@types/node": "22.13.10",
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",
+    "concurrently": "^9.2.1",
     "eslint": "9.22.0",
-    "eslint-config-next": "16.2.1",
-    "typescript": "5.8.2"
+    "globals": "^16.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "5.8.2",
+    "typescript-eslint": "^8.46.1",
+    "vite": "^7.1.10"
   }
 }

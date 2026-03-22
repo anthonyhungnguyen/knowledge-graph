@@ -1,4 +1,4 @@
-import type { ExplorationGraph, GraphExpandMode, GraphNodeType, KnowledgeNode } from "@/lib/types";
+import type { ExplorationGraph, GraphExpandMode, GraphNodeType, KnowledgeNode } from "./types";
 
 const relatedTemplates = [
   { label: "core idea", type: "concept" as GraphNodeType },

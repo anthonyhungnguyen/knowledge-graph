@@ -1,61 +1,65 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DataSet, Network, type Edge, type IdType, type Node, type Options } from "vis-network/standalone";
-import { getFocusNodeIds } from "@/lib/graph";
-import type { ExplorationGraph, KnowledgeNode } from "@/lib/types";
+import { getFocusNodeIds } from "../lib/graph";
+import type { ExplorationGraph, KnowledgeNode } from "../lib/types";
 
 type KnowledgeGraphProps = {
   graph: ExplorationGraph | null;
+  isLoading: boolean;
   selectedNodeId: string | null;
+  selectedNodeLabel: string | null;
   onNodeSelect: (node: KnowledgeNode) => void;
+  onExpandRelated: () => void;
+  onExpandDeeper: () => void;
 };
 
 function fillForType(type: KnowledgeNode["type"]) {
   switch (type) {
     case "topic":
       return {
-        background: "#2f80ff",
-        border: "#d9eeff",
+        background: "#2d4c78",
+        border: "#b9cde8",
         highlight: {
-          background: "#58a6ff",
-          border: "#ffffff"
+          background: "#2d4c78",
+          border: "#eef4fb"
         }
       };
     case "process":
       return {
-        background: "#0ea77f",
-        border: "#d6fff0",
+        background: "#41635a",
+        border: "#cedfd8",
         highlight: {
-          background: "#2ecf9e",
-          border: "#ffffff"
+          background: "#41635a",
+          border: "#eef4fb"
         }
       };
     case "example":
       return {
-        background: "#f19a3e",
-        border: "#fff0d9",
+        background: "#8e6748",
+        border: "#e5d6c8",
         highlight: {
-          background: "#ffb968",
-          border: "#ffffff"
+          background: "#8e6748",
+          border: "#eef4fb"
         }
       };
     case "person":
       return {
-        background: "#d55078",
-        border: "#ffe1ea",
+        background: "#6d5872",
+        border: "#ddd2e0",
         highlight: {
-          background: "#ef7096",
-          border: "#ffffff"
+          background: "#6d5872",
+          border: "#eef4fb"
         }
       };
     default:
       return {
-        background: "#49617c",
-        border: "#dbe7f4",
+        background: "#5a6775",
+        border: "#d6dde6",
         highlight: {
-          background: "#6483a5",
-          border: "#ffffff"
+          background: "#5a6775",
+          border: "#eef4fb"
         }
       };
   }
@@ -72,67 +76,56 @@ function buildItems(graph: ExplorationGraph, selectedNodeId: string | null) {
       id: node.id,
       label: node.label,
       shape: "dot",
-      size: node.type === "topic" ? (isSelected ? 42 : 38) : isSelected ? 30 : 26,
+      size: node.type === "topic" ? (isSelected ? 34 : 30) : isSelected ? 22 : 18,
       font: {
-        color: isFocused ? "#f7fbff" : "rgba(247, 251, 255, 0.32)",
-        size: node.type === "topic" ? 18 : 14,
-        face: "Inter, ui-sans-serif, system-ui, sans-serif",
+        color: isFocused ? "#f3f7fd" : "rgba(243, 247, 253, 0.24)",
+        size: node.type === "topic" ? 16 : 13,
+        face: "system-ui, sans-serif",
         strokeWidth: 0
       },
       color: isFocused
         ? fillForType(node.type)
         : {
-            background: "rgba(84, 100, 122, 0.22)",
-            border: "rgba(189, 204, 224, 0.22)",
+            background: "rgba(128, 141, 157, 0.16)",
+            border: "rgba(189, 204, 224, 0.16)",
             highlight: {
-              background: "rgba(84, 100, 122, 0.22)",
-              border: "rgba(189, 204, 224, 0.22)"
+              background: "rgba(128, 141, 157, 0.16)",
+              border: "rgba(189, 204, 224, 0.16)"
             }
           },
-      borderWidth: isSelected ? 4 : node.type === "topic" ? 3 : 2,
-      shadow: {
-        enabled: isFocused,
-        color: "rgba(3, 10, 19, 0.28)",
-        size: 24,
-        x: 0,
-        y: 12
-      },
-      mass: node.type === "topic" ? 4 : 2.2
+      borderWidth: isSelected ? 3 : node.type === "topic" ? 2.5 : 1.5
     };
   });
 
   const edges: Edge[] = graph.edges.map((edge, index) => {
     const isFocusedEdge = !selectedNodeId || edge.source === selectedNodeId || edge.target === selectedNodeId;
+    const showEdgeLabel = Boolean(selectedNodeId) && isFocusedEdge;
 
     return {
-      id: `${edge.source}-${edge.target}-${index}`,
+      id: `${edge.source}:${edge.target}:${edge.label}:${index}`,
       from: edge.source,
       to: edge.target,
-      label: edge.label,
+      label: showEdgeLabel ? edge.label : undefined,
       color: {
-        color: isFocusedEdge ? "rgba(224, 231, 255, 0.22)" : "rgba(224, 231, 255, 0.08)",
-        highlight: "rgba(224, 231, 255, 0.42)",
-        hover: "rgba(224, 231, 255, 0.36)"
+        color: isFocusedEdge ? "rgba(214, 224, 244, 0.22)" : "rgba(214, 224, 244, 0.08)",
+        highlight: "rgba(214, 224, 244, 0.22)",
+        hover: "rgba(214, 224, 244, 0.22)"
       },
-      font: {
-        color: isFocusedEdge ? "rgba(232, 238, 247, 0.78)" : "rgba(232, 238, 247, 0.24)",
-        size: 11,
-        face: "Inter, ui-sans-serif, system-ui, sans-serif",
-        background: isFocusedEdge ? "rgba(10, 17, 28, 0.9)" : "rgba(10, 17, 28, 0.42)",
-        strokeWidth: 0
-      },
-      width: isFocusedEdge ? 1.5 : 1,
-      selectionWidth: 2.2,
+      font: showEdgeLabel
+        ? {
+            color: "rgba(229, 236, 246, 0.74)",
+            size: 10,
+            face: "system-ui, sans-serif",
+            background: "rgba(14, 22, 34, 0.84)",
+            strokeWidth: 0
+          }
+        : undefined,
+      width: isFocusedEdge ? 1.15 : 0.75,
+      selectionWidth: 1.4,
       smooth: {
-        enabled: true,
-        type: "dynamic",
-        roundness: 0.28
-      },
-      arrows: {
-        to: {
-          enabled: true,
-          scaleFactor: 0.6
-        }
+        enabled: false,
+        type: "continuous",
+        roundness: 0
       }
     };
   });
@@ -140,11 +133,7 @@ function buildItems(graph: ExplorationGraph, selectedNodeId: string | null) {
   return { nodes, edges };
 }
 
-function withStoredPositions(
-  graph: ExplorationGraph,
-  nodes: Node[],
-  positionCache: Map<string, { x: number; y: number }>
-) {
+function withStoredPositions(graph: ExplorationGraph, nodes: Node[], positionCache: Map<string, { x: number; y: number }>) {
   const nextPositions = new Map(positionCache);
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
   const childrenBySource = new Map<string, string[]>();
@@ -227,10 +216,16 @@ function withStoredPositions(
 const networkOptions: Options = {
   autoResize: true,
   interaction: {
-    hover: true,
-    tooltipDelay: 120,
+    hover: false,
     navigationButtons: false,
-    keyboard: false
+    keyboard: false,
+    dragNodes: false,
+    hideEdgesOnDrag: true,
+    hideNodesOnDrag: false,
+    hideEdgesOnZoom: true,
+    selectConnectedEdges: false,
+    zoomView: true,
+    dragView: true
   },
   physics: {
     enabled: false
@@ -239,73 +234,65 @@ const networkOptions: Options = {
     shape: "dot"
   },
   edges: {
-    selectionWidth: 2
+    selectionWidth: 1.4
+  },
+  layout: {
+    improvedLayout: false
   }
 };
 
-export function KnowledgeGraph({ graph, selectedNodeId, onNodeSelect }: KnowledgeGraphProps) {
+export function KnowledgeGraph({
+  graph,
+  isLoading,
+  selectedNodeId,
+  selectedNodeLabel,
+  onNodeSelect,
+  onExpandRelated,
+  onExpandDeeper
+}: KnowledgeGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const networkRef = useRef<Network | null>(null);
   const dataRef = useRef<{ nodes: DataSet<Node>; edges: DataSet<Edge> } | null>(null);
   const positionCacheRef = useRef(new Map<string, { x: number; y: number }>());
   const currentRootIdRef = useRef<string | null>(null);
   const nodeByIdRef = useRef<Map<string, KnowledgeNode>>(new Map());
-  const onNodeSelectRef = useRef(onNodeSelect);
+  const [actionPosition, setActionPosition] = useState<{ left: number; top: number } | null>(null);
   const nodeById = useMemo(() => new Map(graph?.nodes.map((node) => [node.id, node]) ?? []), [graph]);
 
-  useEffect(() => {
-    nodeByIdRef.current = nodeById;
-    onNodeSelectRef.current = onNodeSelect;
-  }, [nodeById, onNodeSelect]);
+  function updateActionPosition() {
+    const network = networkRef.current;
+    const container = containerRef.current;
 
-  useEffect(() => {
-    if (!graph || !containerRef.current || networkRef.current) {
+    if (!network || !container || !selectedNodeId) {
+      setActionPosition(null);
       return;
     }
 
-    const data = {
-      nodes: new DataSet<Node>(),
-      edges: new DataSet<Edge>()
-    };
-    const network = new Network(containerRef.current, data, networkOptions);
+    const positions = network.getPositions([selectedNodeId]);
+    const position = positions[selectedNodeId];
 
-    network.on("click", (params?: { nodes?: IdType[] }) => {
-      const clickedNodeId = params?.nodes?.[0];
+    if (!position) {
+      setActionPosition(null);
+      return;
+    }
 
-      if (clickedNodeId) {
-        const node = nodeByIdRef.current.get(String(clickedNodeId));
+    const domPosition = network.canvasToDOM(position);
+    const left = Math.min(Math.max(domPosition.x + 18, 20), Math.max(container.clientWidth - 212, 20));
+    const top = Math.min(Math.max(domPosition.y - 18, 20), Math.max(container.clientHeight - 72, 20));
 
-        if (node) {
-          onNodeSelectRef.current(node);
-        }
-        return;
-      }
-
-      const rootNodeId = currentRootIdRef.current;
-      const rootNode = rootNodeId ? nodeByIdRef.current.get(rootNodeId) : null;
-
-      if (rootNode) {
-        onNodeSelectRef.current(rootNode);
-      }
-    });
-
-    networkRef.current = network;
-    dataRef.current = data;
-  }, [graph]);
+    setActionPosition({ left, top });
+  }
 
   useEffect(() => {
-    return () => {
+    nodeByIdRef.current = nodeById;
+  }, [nodeById]);
+
+  useEffect(() => {
+    if (!graph || !containerRef.current) {
       networkRef.current?.destroy();
       networkRef.current = null;
       dataRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const network = networkRef.current;
-    const data = dataRef.current;
-
-    if (!network || !data || !graph) {
+      setActionPosition(null);
       return;
     }
 
@@ -314,18 +301,7 @@ export function KnowledgeGraph({ graph, selectedNodeId, onNodeSelect }: Knowledg
 
     if (isNewRoot) {
       positionCacheRef.current = new Map();
-    } else {
-      const currentPositions = network.getPositions();
-
-      Object.entries(currentPositions).forEach(([id, position]) => {
-        positionCacheRef.current.set(id, {
-          x: position.x,
-          y: position.y
-        });
-      });
     }
-
-    currentRootIdRef.current = graph.rootId;
 
     const built = buildItems(graph, selectedNodeId);
     const positionedNodes = withStoredPositions(graph, built.nodes, positionCacheRef.current);
@@ -340,33 +316,92 @@ export function KnowledgeGraph({ graph, selectedNodeId, onNodeSelect }: Knowledg
       ])
     );
 
-    data.nodes.clear();
-    data.edges.clear();
-    data.nodes.add(positionedNodes);
-    data.edges.add(built.edges);
+    currentRootIdRef.current = graph.rootId;
 
-    if (isNewRoot) {
-      network.fit({
-        animation: {
-          duration: 350,
-          easingFunction: "easeInOutQuad"
+    const data = {
+      nodes: new DataSet<Node>(positionedNodes),
+      edges: new DataSet<Edge>(built.edges)
+    };
+
+    networkRef.current?.destroy();
+
+    const network = new Network(containerRef.current, data, networkOptions);
+
+    network.on("click", (params?: { nodes?: IdType[] }) => {
+      const clickedNodeId = params?.nodes?.[0];
+
+      if (clickedNodeId) {
+        const selectedNode = nodeByIdRef.current.get(String(clickedNodeId));
+
+        if (selectedNode) {
+          onNodeSelect(selectedNode);
         }
-      });
+        return;
+      }
+
+      const rootNode = nodeByIdRef.current.get(graph.rootId);
+
+      if (rootNode) {
+        onNodeSelect(rootNode);
+      }
+    });
+
+    network.on("dragStart", () => {
+      setActionPosition(null);
+    });
+
+    network.on("dragEnd", () => {
+      updateActionPosition();
+    });
+
+    network.on("zoom", () => {
+      updateActionPosition();
+    });
+
+    networkRef.current = network;
+    dataRef.current = data;
+
+    window.setTimeout(() => {
+      updateActionPosition();
+    }, 0);
+
+    return () => {
+      network.destroy();
+    };
+  }, [graph, onNodeSelect, selectedNodeId]);
+
+  useEffect(() => {
+    const network = networkRef.current;
+    const data = dataRef.current;
+
+    if (!network || !data || !graph) {
+      return;
     }
+
+    const built = buildItems(graph, selectedNodeId);
+
+    data.nodes.update(withStoredPositions(graph, built.nodes, positionCacheRef.current));
+    data.edges.clear();
+    data.edges.add(built.edges);
 
     if (!selectedNodeId) {
       network.unselectAll();
+      setActionPosition(null);
       return;
     }
 
     network.selectNodes([selectedNodeId]);
     network.focus(selectedNodeId, {
-      scale: 1.05,
+      scale: 1.02,
       animation: {
-        duration: 350,
+        duration: 180,
         easingFunction: "easeInOutQuad"
       }
     });
+
+    window.setTimeout(() => {
+      updateActionPosition();
+    }, 200);
   }, [graph, selectedNodeId]);
 
   if (!graph) {
@@ -380,6 +415,28 @@ export function KnowledgeGraph({ graph, selectedNodeId, onNodeSelect }: Knowledg
   return (
     <div className="graph-shell">
       <div ref={containerRef} className="graph-canvas graph-vis" />
+      {actionPosition && selectedNodeId ? (
+        <div
+          className="graph-node-actions"
+          style={{
+            left: `${actionPosition.left}px`,
+            top: `${actionPosition.top}px`
+          }}
+        >
+          <span className="graph-node-actions-label">{selectedNodeLabel ?? "Selection"}</span>
+          <button type="button" className="graph-node-action" onClick={onExpandRelated}>
+            Related
+          </button>
+          <button type="button" className="graph-node-action graph-node-action-secondary" onClick={onExpandDeeper}>
+            Deeper
+          </button>
+        </div>
+      ) : null}
+      {isLoading ? (
+        <div className="graph-loading-overlay">
+          <div className="graph-loading-pill">Updating map</div>
+        </div>
+      ) : null}
     </div>
   );
 }

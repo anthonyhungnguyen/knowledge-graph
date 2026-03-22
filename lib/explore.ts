@@ -1,5 +1,5 @@
-import { buildMockGraph } from "@/lib/mock-graph";
-import type { ExplorationGraph, GraphExpandMode, GraphNodeType, KnowledgeEdge, KnowledgeNode } from "@/lib/types";
+import { buildMockGraph } from "./mock-graph";
+import type { ExplorationGraph, GraphExpandMode, GraphNodeType, KnowledgeEdge, KnowledgeNode } from "./types";
 
 const openAiModel = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
 

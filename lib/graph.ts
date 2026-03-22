@@ -1,4 +1,4 @@
-import type { ExplorationGraph, GraphNodeType, KnowledgeEdge, KnowledgeNode } from "@/lib/types";
+import type { ExplorationGraph, GraphNodeType, KnowledgeEdge, KnowledgeNode } from "./types";
 
 export function mergeGraph(current: ExplorationGraph | null, incoming: ExplorationGraph): ExplorationGraph {
   if (!current) {
